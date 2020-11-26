@@ -92,10 +92,53 @@ class GPT(nn.Module):
         self.out_fc = nn.Linear(config.embed_dim, config.vocab_size, bias=False)
 
     def _init_weights(self, module):
-        pass 
+        if isinstance(module, (nn.Linear, nn.Embedding)):
+            module.weight.data.normal_(mean=0.0, std=0.02)
+            if isinstance(module, nn.Linear) and module.bias is not None:
+                module.bias.data.zero_()
+        elif isinstance(module, nn.LayerNorm):
+            module.bias.data.zero_()
+            module.weight.data.fill_(1.0) 
 
     def configure_opt(self, train_config):
-        pass
+        # separate out all parameters to those that will and won't experience regularizing weight decay
+        decay = set()
+        no_decay = set()
+        whitelist_weight_modules = (torch.nn.Linear, )
+        blacklist_weight_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
+
+        for module_name, module in self.named_modules():
+            for param_name, param, in module.named_parameters():
+                full_param_name = f'{module_name}.{param_name}' if module_name else param_name 
+
+                if param_name.endswith('bias'):
+                    # all biases will not be decayed
+                    no_decay.add(full_param_name)
+                elif param_name.endswith('weight') and isinstance(module, whitelist_weight_modules):
+                    # weights of whitelist modules will be weight decayed
+                    decay.add(full_param_name)
+                elif param_name.endswith('weight') and isinstance(module, blacklist_weight_modules):
+                    # weights of blacklist modules will NOT be weight decayed
+                    no_decay.add(full_param_name)
+
+        # special case the position embedding parameter in the root GPT module as not decayed
+        no_decay.add('pos_emb')
+
+        # validate that we considered every parameter
+        param_dict = {pn: p for pn, p in self.named_parameters()}
+        param_inter = decay & no_decay
+        param_union = decay | no_decay
+        assert len(param_inter) == 0, f"parameters {param_inter} made it into both decay/no_decay sets!" 
+        assert len(param_dict.keys() - param_union) == 0, f"parameters {param_dict.keys() - param_union} were not separated into either decay/no_decay set!" \
+                                                   
+
+        # create the pytorch optimizer object
+        optim_groups = [
+            {"params": [param_dict[pn] for pn in sorted(list(decay))], "weight_decay": train_config.weight_decay},
+            {"params": [param_dict[pn] for pn in sorted(list(no_decay))], "weight_decay": 0.0},
+        ]
+        optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
+        return optimizer
     
     def forward(self, idc, targets = None):
         num_batch, seq_len = idc.shape
