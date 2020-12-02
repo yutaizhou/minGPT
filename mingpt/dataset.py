@@ -28,7 +28,7 @@ class CharDataset(Dataset):
 
     def __getitem__(self, idx) -> Tuple[Tensor, Tensor]:
         start = idx
-        end = idx + self.seq_len + 1
+        end = idx + self.seq_len + 1 # if end goes over, it just stops at the last character of the data buffer
         chunk = self.data[start:end]
         idc: List[int] = [self.stoi[s] for s in chunk] # (seq_len + 1) ints
         

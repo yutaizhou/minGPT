@@ -48,7 +48,7 @@ class CausalSelfAttention(nn.Module):
         out = weights @ v # num_batch x num_head x seq_len x x head_dim 
         out = out.transpose(1,2).contiguous().view(num_batch, seq_len, embed_dim)
 
-        # output projection, the petite dessert
+        # output projection, the smol dessert
         return self.residual_dropout(self.out_proj(out))
 
 
@@ -90,6 +90,25 @@ class GPT(nn.Module):
         # decoder head
         self.ln = nn.LayerNorm(config.embed_dim)
         self.out_fc = nn.Linear(config.embed_dim, config.vocab_size, bias=False)
+
+    def forward(self, idc, targets = None):
+        num_batch, seq_len = idc.shape
+        assert seq_len <= self.seq_len ,"Char sequence length too long"
+
+        tok_embeddings = self.tok_embed(idc) # num_batch x seq_len x embed_dim
+        pos_embeddings = self.pos_embed[:seq_len, :].unsqueeze(0) # 1 x seq_len x embed_dim
+
+        x = self.embed_dropout(tok_embeddings + pos_embeddings) # num_batch x seq_len x embed_dim
+        x = self.tf(x) 
+        x = self.ln(x)
+        logits = self.out_fc(x) # num_batch x seq_len x vocab_size
+        
+        # calculate the loss if given targets
+        loss = None
+        if targets is not None:
+            loss = F.cross_entropy(logits.view(-1, logits.shape[-1]), targets.view(-1))
+
+        return logits, loss
 
     def _init_weights(self, module):
         if isinstance(module, (nn.Linear, nn.Embedding)):
@@ -140,21 +159,4 @@ class GPT(nn.Module):
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
         return optimizer
     
-    def forward(self, idc, targets = None):
-        num_batch, seq_len = idc.shape
-        assert seq_len <= self.seq_len ,"Char sequence length too long"
 
-        tok_embeddings = self.tok_embed(idc) # num_batch x seq_len x embed_dim
-        pos_embeddings = self.pos_embed[:seq_len, :].unsqueeze(0) # 1 x seq_len x embed_dim
-
-        x = self.embed_dropout(tok_embeddings + pos_embeddings) # num_batch x seq_len x embed_dim
-        x = self.tf(x) 
-        x = self.ln(x)
-        logits = self.out_fc(x) # num_batch x seq_len x vocab_size
-        
-        # calculate the loss if given targets
-        loss = None
-        if targets is not None:
-            loss = F.cross_entropy(logits.view(-1, logits.shape[-1]), targets.view(-1))
-
-        return logits, loss
