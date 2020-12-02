@@ -1,12 +1,16 @@
 import torch
 from torch._C import dtype
 from torch.tensor import Tensor
-from torch.utils.data import Dataset, data
+from torch.utils.data import Dataset
 
-from typing import Tuple
+from typing import List, Tuple
 
 class CharDataset(Dataset):
-    def __init__(self, data, seq_len = 128):
+    """
+    Takes a giant str of read text file as input, operates on CHARACTER level, so vocab will just be 
+    whatever letters and symbols found in text, not full words. 
+    """
+    def __init__(self, data: str, seq_len=128):
         chars = sorted(set(data))
 
         self.data = data
@@ -23,10 +27,12 @@ class CharDataset(Dataset):
         return self.data_size - self.seq_len
 
     def __getitem__(self, idx) -> Tuple[Tensor, Tensor]:
-        chunk = self.data[idx:idx + self.seq_len + 1]
-        idc = [self.stoi[s] for s in chunk] # (seq_len + 1) ints
+        start = idx
+        end = idx + self.seq_len + 1
+        chunk = self.data[start:end]
+        idc: List[int] = [self.stoi[s] for s in chunk] # (seq_len + 1) ints
         
-        x = torch.tensor(idc[:self.seq_len], dtype = torch.long) # seq_len 
-        y = torch.tensor(idc[1:], dtype = torch.long) # seq_len
+        x = torch.tensor(idc[:self.seq_len], dtype=torch.long) # seq_len 
+        y = torch.tensor(idc[1:], dtype=torch.long) # seq_len shifted over by 1 as target
 
         return x, y

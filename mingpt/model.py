@@ -85,7 +85,7 @@ class GPT(nn.Module):
         self.embed_dropout = nn.Dropout(config.embed_dropout)
 
         # transformer 
-        self.tf = nn.Sequential([Layer(config) for _ in range(config.num_layer)])
+        self.tf = nn.Sequential(*[Layer(config) for _ in range(config.num_layer)])
 
         # decoder head
         self.ln = nn.LayerNorm(config.embed_dim)
