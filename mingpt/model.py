@@ -22,8 +22,8 @@ class CausalSelfAttention(nn.Module):
         self.to_q = nn.Linear(config.embed_dim, config.embed_dim)
         self.to_v = nn.Linear(config.embed_dim, config.embed_dim)
         # regularization
-        self.attn_dropout = config.attn_dropout
-        self.residual_dropout = config.residual_dropout
+        self.attn_dropout = nn.Dropout(config.attn_dropout)
+        self.residual_dropout = nn.Dropout(config.residual_dropout)
         # output projection
         self.out_proj = nn.Linear(config.embed_dim, config.embed_dim)
         # causal attention mask to ensure entry only attend to previous entries. Entries at or below diagonal is attended to
@@ -100,7 +100,7 @@ class GPT(nn.Module):
             module.bias.data.zero_()
             module.weight.data.fill_(1.0) 
 
-    def configure_opt(self, train_config):
+    def configure_optimizer(self, train_config):
         # separate out all parameters to those that will and won't experience regularizing weight decay
         decay = set()
         no_decay = set()
@@ -122,7 +122,7 @@ class GPT(nn.Module):
                     no_decay.add(full_param_name)
 
         # special case the position embedding parameter in the root GPT module as not decayed
-        no_decay.add('pos_emb')
+        no_decay.add('pos_embed')
 
         # validate that we considered every parameter
         param_dict = {pn: p for pn, p in self.named_parameters()}
@@ -142,7 +142,7 @@ class GPT(nn.Module):
     
     def forward(self, idc, targets = None):
         num_batch, seq_len = idc.shape
-        assert seq_len < self.seq_len ,"Char sequence length too long"
+        assert seq_len <= self.seq_len ,"Char sequence length too long"
 
         tok_embeddings = self.tok_embed(idc) # num_batch x seq_len x embed_dim
         pos_embeddings = self.pos_embed[:seq_len, :].unsqueeze(0) # 1 x seq_len x embed_dim

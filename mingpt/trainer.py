@@ -72,7 +72,7 @@ class Trainer():
                     
                     lr = config.lr * lr_multiplier
                     
-                    for param_group in optimizer.param_group:
+                    for param_group in optimizer.param_groups:
                         param_group['lr'] = lr
                 else:
                     lr = config.lr
@@ -89,7 +89,7 @@ class Trainer():
     def train(self):
         model, config = self.model, self.config
         raw_model = model.module if hasattr(self.model, "module") else model
-        self.optimizer = raw_model.configure_optimizers(config)
+        self.optimizer = raw_model.configure_optimizer(config)
 
         best_loss = float('inf')
         self.tokens = 0 # for lr decay
@@ -98,7 +98,7 @@ class Trainer():
 
             self.tokens = self._run_epoch(self.model, self.optimizer,
                                           self.train_dataset, self.test_dataset,
-                                          self.tokens, 'test', epoch, self.config, self.device)
+                                          self.tokens, 'train', epoch, self.config, self.device)
             if self.test_dataset is not None:
                 test_loss, self.tokens = self._run_epoch(self.model, self.optimizer,
                                                          self.train_dataset, self.test_dataset,
