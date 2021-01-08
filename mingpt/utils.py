@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+from tqdm import tqdm
 
 def set_seed(seed):
     random.seed(seed)
@@ -24,11 +25,12 @@ def sample(model, x, steps: int, temp: float=1, sample: bool=False, top_k: int=N
     """
     x: num_batch x seq_len
     """
+    print('Begin Sampling...')
     seq_len = model.seq_len
     model.eval()
 
-    for _ in range(steps):
-        x_cond = x if x.shape[1] <= seq_len else x[:, -seq_len] # truncate if seq_len > context window
+    for _ in tqdm(range(steps)):
+        x_cond = x if x.shape[1] <= seq_len else x[:, -seq_len:] # truncate if seq_len > context window
         logits, _ = model(x_cond) # num_batch x seq_len x vocab_size
         logits = logits[:,-1,:] / temp # scale logits at the final time step by temperature
 
